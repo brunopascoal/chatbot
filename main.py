@@ -10,7 +10,7 @@ st.set_page_config(
 with st.sidebar:
   st.title("ChatBot")
   st.write("")
-  
+
   vector_store = load_existing_vector_store()
 
   api_key = st.text_input("OpenAI API Key", type="password")
@@ -26,6 +26,7 @@ with st.sidebar:
       for file in upload_files:
         chunks = create_chunks(file)
         all_chunks.extend(chunks)
+      vector_store = add_to_vector_store(all_chunks, vector_store)
 
   st.markdown(
     """
@@ -46,6 +47,7 @@ if vector_store and question:
   st.session_state.messages.append({'role': 'user', 'content': question})
 
   response = ask_question(
+    api_key=api_key,
     query=question,
     vector_store=vector_store,
   )

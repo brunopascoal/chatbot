@@ -16,5 +16,24 @@ with st.sidebar:
       ### About
       #### This is a chatbot that you can upload csv files for use as a context for the chatbot.
     """ )
-  
+
+if 'messages' not in st.session_state:
+  st.session_state['messages'] = []
+
 question = st.chat_input('Type your question here')
+
+if vector_store and question:
+  for message in st.session_state.messages:
+    st.chat_message(message.get('role')).write(message.get('content'))
+
+  st.chat_message('user').write(question)
+  st.session_state.messages.append({'role': 'user', 'content': question})
+
+  response = ask_question(
+    model=model,
+    query=question,
+    vector_store=vector_store,
+  )
+
+  st.chat_message('ai').write(response)
+  st.session_state.messages.append({'role': 'ai', 'content': response})

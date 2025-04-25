@@ -10,6 +10,12 @@ with st.sidebar:
   st.title("ChatBot")
   st.write("")
 
+  api_key = st.text_input("OpenAI API Key", type="password")
+  upload_files = st.file_uploader(
+    label="Put your csv files here",
+    type=[".csv"],
+    accept_multiple_files=True,
+  )
 
   st.markdown(
     """

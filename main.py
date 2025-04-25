@@ -1,4 +1,5 @@
 import streamlit as st
+from ai import create_chunks
 
 st.set_page_config(
   page_title="ChatBot",
@@ -16,6 +17,13 @@ with st.sidebar:
     type=[".csv"],
     accept_multiple_files=True,
   )
+
+  if upload_files:
+    with st.spinner("Loading files..."):
+      all_chunks = []
+      for file in upload_files:
+        chunks = create_chunks(file)
+        all_chunks.extend(chunks)
 
   st.markdown(
     """

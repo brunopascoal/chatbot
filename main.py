@@ -1,5 +1,5 @@
 import streamlit as st
-from ai import create_chunks
+from ai import create_chunks, load_existing_vector_store, add_to_vector_store, ask_question
 
 st.set_page_config(
   page_title="ChatBot",
@@ -10,6 +10,8 @@ st.set_page_config(
 with st.sidebar:
   st.title("ChatBot")
   st.write("")
+  
+  vector_store = load_existing_vector_store()
 
   api_key = st.text_input("OpenAI API Key", type="password")
   upload_files = st.file_uploader(
@@ -44,7 +46,6 @@ if vector_store and question:
   st.session_state.messages.append({'role': 'user', 'content': question})
 
   response = ask_question(
-    model=model,
     query=question,
     vector_store=vector_store,
   )

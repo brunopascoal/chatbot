@@ -1,6 +1,6 @@
-# Financial PDF Chatbot
+# What is this?
 
-A smart financial assistant chatbot that can process PDF documents and answer questions based on their content. Built with Streamlit, LangChain, and OpenAI.
+This is a simple chatbot application built using Streamlit and LangChain, creating a RAG (Retrieval-Augmented Generation) chatbot. The chatbot can process multiple PDF files, extract text from them, and generate responses based on the content of the uploaded documents.
 
 ## Features
 

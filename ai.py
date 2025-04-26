@@ -1,5 +1,5 @@
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import CSVLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_openai import OpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -8,97 +8,97 @@ from langchain.chains.retrieval import create_retrieval_chain
 import streamlit as st
 import os
 import tempfile
+from dotenv import load_dotenv
 
 persist_directory = "db/db"
 
-def ask_question(api_key, query, vector_store):
+load_dotenv()
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
-  llm = OpenAI(
-      api_key=api_key
-  )
-  retriever = vector_store.as_retriever()
 
-  system_prompt = '''
-  Você é um assistente financeiro inteligente. Use o contexto abaixo para responder perguntas relacionadas às despesas registradas.
+def ask_question(query, vector_store):
+    llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    retriever = vector_store.as_retriever()
 
-  Responda em formato **markdown**, utilizando visualizações **elaboradas e interativas** sempre que possível (como tabelas ou gráficos).
+    system_prompt = """
+    You are an AI assistant for answering questions about the content of the PDF files.
+    If the question is not related to the content of the PDF files, please answer that you do not know.
+    If the question is related to the content of the PDF files, please answer the question.
+    If the question is a greeting, please respond with a friendly greeting. 
+    Context: {context}
+    """
 
-  **Instruções Importantes:**
-  - Desconsidere linhas onde a coluna `Tipo` contenha o texto **"Total mês"**.
-  - Considere apenas valores válidos e numéricos da coluna `Valor`.
-  - Caso a coluna `Data` esteja em branco, utilize a coluna `mês` para entender o período da despesa.
-  - Linhas com parcelas devem ser tratadas como **somente a parcela atual**, e **não o valor total da compra**.
-  - Despesas com categoria **"Fixo"** devem ser consideradas recorrentes.
+    messages = [("system", system_prompt)]
+    for message in st.session_state.messages:
+        messages.append((message.get("role"), message.get("content")))
+    messages.append(("human", "{input}"))
 
-  Você pode ser solicitado a:
-  - Calcular totais por mês, por categoria ou por banco.
-  - Listar parcelas ativas no mês.
-  - Gerar resumos interativos das despesas.
-  - Fazer comparações entre meses (considere os nomes dos meses normalizados, como "Março", "março", etc).
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ]
+    )
 
-  Contexto: {context}
-  '''
+    question_answer_chain = create_stuff_documents_chain(
+        llm=llm,
+        prompt=prompt,
+    )
 
-  messages = [('system', system_prompt)]
-  for message in st.session_state.messages:
-    messages.append((message.get('role'), message.get('content')))
-  messages.append(('human', '{input}'))
+    chain = create_retrieval_chain(
+        retriever=retriever, combine_docs_chain=question_answer_chain
+    )
 
-  prompt = ChatPromptTemplate.from_messages(messages)
+    response = chain.invoke({"input": query})
 
-  question_answer_chain = create_stuff_documents_chain(
-      llm=llm,
-      prompt=prompt,
-  )
+    return response.get("answer")
 
-  chain = create_retrieval_chain(
-      retriever=retriever,
-      combine_docs_chain=question_answer_chain
-  )
 
-  response = chain.invoke({'input': query})
-
-  return response.get('answer')
 def create_chunks(file):
-  
-  with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-    temp_file.write(file.read())
-    temp_file_path = temp_file.name
 
-  loader = CSVLoader(file_path=temp_file_path)
-  docs = loader.load()
-  os.remove(temp_file_path)
-  text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=400,
-  )
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(file.read())
+        temp_file_path = temp_file.name
 
-  chunks = text_splitter.split_documents(
-    documents=docs,
-  )
+    loader = PyPDFLoader(
+        file_path=temp_file_path,
+    )
+    docs = loader.load()
 
-  return chunks
+    os.remove(temp_file_path)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=300,
+        chunk_overlap=60,
+    )
+    chunks = text_splitter.split_documents(documents=docs)
+
+    chunks = text_splitter.split_documents(
+        documents=docs,
+    )
+
+    return chunks
+
 
 def load_existing_vector_store():
-  if os.path.exists(os.path.join(persist_directory)):
-    embedding_function = OpenAIEmbeddings(model='text-embedding-3-large')
-    vector_store = Chroma(
-      persist_directory=persist_directory,
-      embedding_function=embedding_function,
-    )
-    return vector_store
-  return None
+    if os.path.isdir(persist_directory) and os.listdir(persist_directory):
+        vector_store = Chroma(
+            persist_directory=persist_directory,
+            embedding_function=embeddings,
+        )
+        return vector_store
+    return None
+
 
 def add_to_vector_store(chunks, vector_store):
-  if vector_store:
-    vector_store.add_documents(chunks)
-  else:
-    embedding_function = OpenAIEmbeddings(model='text-embedding-3-large')
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
-    vector_store = Chroma.from_documents(
-      documents=chunks,
-      embedding_function=embedding_function,
-      persist_directory=persist_directory,
-    )
-    return vector_store
-  
+    if vector_store:
+        vector_store.add_documents(chunks)
+        return vector_store
+    else:
+        vector_store = Chroma.from_documents(
+            documents=chunks,
+            embedding=embeddings,
+            persist_directory=persist_directory,
+        )
+        return vector_store

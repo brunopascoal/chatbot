@@ -13,10 +13,10 @@ with st.sidebar:
 
   vector_store = load_existing_vector_store()
 
-  api_key = st.text_input("OpenAI API Key", type="password")
+  #api_key = st.text_input("OpenAI API Key", type="password")
   upload_files = st.file_uploader(
-    label="Put your csv files here",
-    type=[".csv"],
+    label="Put your pdf files here",
+    type=[".pdf"],
     accept_multiple_files=True,
   )
 
@@ -47,7 +47,6 @@ if vector_store and question:
   st.session_state.messages.append({'role': 'user', 'content': question})
 
   response = ask_question(
-    api_key=api_key,
     query=question,
     vector_store=vector_store,
   )
